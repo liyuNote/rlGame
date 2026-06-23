@@ -1,0 +1,15 @@
+name: rlgame-ppo
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - scipy
+  - matplotlib
+  - tqdm
+  - gymnasium
+  - pytorch
+  - cpuonly

@@ -1,0 +1,7 @@
+{
+  "python.defaultInterpreterPath": "D:\\app\\anaconda\\envs\\rlgame-ppo\\python.exe",
+  "python.analysis.extraPaths": [
+    "D:\\app\\anaconda\\envs\\rlgame-ppo\\Lib\\site-packages"
+  ],
+  "python.analysis.indexing": true
+}
