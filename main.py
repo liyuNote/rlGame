@@ -168,19 +168,30 @@ def train_network(args, env, show_picture=True, pre_train=False, d_capture=15000
                 pursuer_action = pursuer_a
                 evader_action = evader_a
 
-            s_, r, done = env.step(pursuer_action, evader_action, episode_count)
+            s_, r, terminated, truncated = env.step(
+                pursuer_action,
+                evader_action,
+                episode_count,
+            )
             episode_reward += r
 
-            # dw marks transitions where there is no bootstrap value from s_.
-            dw = bool(done or episode_count >= args.max_episode_steps)
-            replay_buffer.store(s, pursuer_action, pursuer_a_logprob, r, s_, dw, done)
+            episode_done = terminated or truncated
+            replay_buffer.store(
+                s,
+                pursuer_action,
+                pursuer_a_logprob,
+                r,
+                s_,
+                terminated,
+                episode_done,
+            )
             s = s_
 
             if replay_buffer.count == args.batch_size:
                 pursuer_agent.update(replay_buffer, episode)
                 replay_buffer.count = 0
 
-            if done:
+            if episode_done:
                 episode_rewards.append(episode_reward)
                 episode_mean_rewards.append(float(np.mean(episode_rewards)))
                 pbar.set_postfix(
@@ -249,7 +260,12 @@ def test_network(
             pursuer_action = pursuer_a
             evader_action = evader_a
 
-        s, r, done = env.step(pursuer_action, evader_action, episode_count)
+        s, r, terminated, truncated = env.step(
+            pursuer_action,
+            evader_action,
+            episode_count,
+        )
+        episode_done = terminated or truncated
         episode_reward += r
 
         pursuer_position.append(s[6:9])
@@ -263,7 +279,7 @@ def test_network(
         history["reward"].append(float(r))
         history["cumulative_reward"].append(float(episode_reward))
         history["distance"].append(float(env.dis))
-        if done:
+        if episode_done:
             break
 
     print(f"Test reward: {episode_reward:.3f}, steps: {episode_count}, distance: {env.dis:.3f}")

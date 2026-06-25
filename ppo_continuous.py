@@ -276,10 +276,10 @@ class PPO_continuous:
     def update(self, replay_buffer, total_steps):
         """用一个 batch 的 on-policy 数据执行 PPO 更新。
 
-        dw=True 表示该 transition 没有可 bootstrap 的下一状态；
-        done=True 表示 episode 终止，用于在 GAE 反向递推中截断。
+        terminated=True 表示没有可用于 bootstrap 的后续状态；
+        episode_done=True 表示当前采样轨迹结束，用于截断 GAE 递推。
         """
-        s, a, a_logprob, r, s_, dw, done = replay_buffer.numpy_to_tensor()
+        s, a, a_logprob, r, s_, terminated, episode_done = replay_buffer.numpy_to_tensor()
 
         # 1. 计算 GAE advantage 和 critic 的监督目标 v_target。
         adv = []
@@ -289,13 +289,17 @@ class PPO_continuous:
             vs_ = self.critic(s_)
 
             # TD residual: delta_t = r_t + gamma * V(s_{t+1}) - V(s_t)。
-            # 若 dw=True，则下一状态价值不参与 bootstrap。
-            deltas = r + self.gamma * (1.0 - dw) * vs_ - vs
+            # 仅真正终止时不使用下一状态价值；时间截断仍然 bootstrap。
+            deltas = r + self.gamma * (1.0 - terminated) * vs_ - vs
 
             # 从后往前递推 GAE：
             # A_t = delta_t + gamma * lambda * A_{t+1}。
-            for delta, d in zip(reversed(deltas.flatten().numpy()), reversed(done.flatten().numpy())):
-                gae = delta + self.gamma * self.lamda * gae * (1.0 - d)
+            # 终止和截断都会结束当前轨迹，不能让 GAE 跨越 reset 继续传播。
+            for delta, trajectory_ended in zip(
+                reversed(deltas.flatten().numpy()),
+                reversed(episode_done.flatten().numpy()),
+            ):
+                gae = delta + self.gamma * self.lamda * gae * (1.0 - trajectory_ended)
                 adv.insert(0, gae)
 
             adv = torch.tensor(adv, dtype=torch.float32).view(-1, 1)

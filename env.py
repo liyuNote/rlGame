@@ -118,7 +118,8 @@ class satellites:
         返回：
         - next_state：18 维下一状态；
         - reward：追踪方奖励；
-        - done：本 episode 是否结束。
+        - terminated：是否因捕获或燃料耗尽而真正终止；
+        - truncated：是否因达到最大步数而截断。
         """
         # 动作裁剪保证策略输出不会超过环境允许的控制能力。
         pursuer_action = np.clip(np.asarray(pursuer_action, dtype=np.float64), -1.6, 1.6)
@@ -146,15 +147,20 @@ class satellites:
         self.Pursuer_position, self.Pursuer_vector = s_pursuer[:3], s_pursuer[3:]
         self.Escaper_position, self.Escaper_vector = s_escaper[:3], s_escaper[3:]
         self.dis = np.linalg.norm(self.Pursuer_position - self.Escaper_position)
-        self.calculate_number_hanger_area()
+        self.calculate_number_danger_area()
 
         # 捕获成功：直接返回高奖励并结束回合。
         if self.dis <= self.d_capture:
-            return self._get_state(), self.win_reward, True
+            return self._get_state(), self.win_reward, True, False
 
-        # 超过最大步数或追踪方燃料耗尽：结束回合。
-        if epsiode_count >= self.max_episode_steps or self.fuel_c <= 0:
-            return self._get_state(), self.burn_reward, True
+        # 追踪方燃料耗尽属于任务真正终止。
+        if self.fuel_c <= 0:
+            return self._get_state(), self.burn_reward, True, False
+
+        # The time limit truncates the sampled trajectory, but the physical
+        # state remains valid and can still be used for value bootstrapping.
+        if epsiode_count >= self.max_episode_steps:
+            return self._get_state(), self.burn_reward, False, True
 
         # 奖励项 1：这一时刻比上一时刻更接近目标则奖励，否则惩罚。
         reward = 1.0 if self.dis < old_distance else -1.0
@@ -166,12 +172,12 @@ class satellites:
         reward += -1.0 if self.dangerous_zone == 0 else self.dangerous_zone * 0.5
 
         # 奖励项 4-7：更细的启发式 shaping，帮助 PPO 在稀疏捕获奖励之外获得学习信号。
-        reward += self.reward_of_action3(self.Pursuer_position)
-        reward += 0.6 * self.reward_of_action1(self.Pursuer_vector)
-        reward += 0.2 * self.reward_of_action2(self.Pursuer_position, self.Pursuer_vector)
-        reward += 2.0 * self.reward_of_action4()
+        reward += self.distance_reward(self.Pursuer_position)
+        reward += 0.6 * self.velocity_penalty(self.Pursuer_vector)
+        reward += 0.2 * self.direction_reward(self.Pursuer_position, self.Pursuer_vector)
+        reward += 2.0 * self.fuel_conservation_reward()
         self.pursuer_reward = float(reward)
-        return self._get_state(), self.pursuer_reward, False
+        return self._get_state(), self.pursuer_reward, False, False
 
     def _get_state(self):
         """组装 18 维状态向量。
@@ -196,7 +202,7 @@ class satellites:
             dtype=np.float32,
         ).ravel()
 
-    def calculate_number_hanger_area(self):
+    def calculate_number_danger_area(self):
         """判断是否处于有效接近区。
 
         如果相对位置和相对速度点积小于 0，说明两者距离有缩小趋势；
@@ -209,7 +215,7 @@ class satellites:
         self.dangerous_zone = int(closing and in_warning_shell)
         return self.dangerous_zone
 
-    def reward_of_action1(self, velocity):
+    def velocity_penalty(self, velocity):
         """速度惩罚项。
 
         速度越大，惩罚越接近 -1。这样可以抑制策略通过无限增大速度来刷接近奖励。
@@ -217,7 +223,7 @@ class satellites:
         speed = np.linalg.norm(velocity)
         return -min(speed / 10000.0, 1.0)
 
-    def reward_of_action2(self, position, velocity):
+    def direction_reward(self, position, velocity):
         """朝向奖励项。
 
         计算追踪方相对逃逸方的速度在“指向逃逸方方向”上的投影。
@@ -229,7 +235,7 @@ class satellites:
         closing_speed = np.dot(velocity - self.Escaper_vector, direction)
         return float(np.tanh(closing_speed / 1000.0))
 
-    def reward_of_action3(self, position):
+    def distance_reward(self, position):
         """位置接近奖励项。
 
         距离进入 4 倍捕获半径内会逐渐得到更高奖励；
@@ -238,7 +244,7 @@ class satellites:
         distance = np.linalg.norm(position - self.Escaper_position)
         return float(np.clip((4.0 * self.d_capture - distance) / (4.0 * self.d_capture), -1.0, 1.0))
 
-    def reward_of_action4(self):
+    def fuel_conservation_reward(self):
         """燃料保留奖励项。
 
         燃料比例越高奖励越高，鼓励策略不要无意义地大幅机动。

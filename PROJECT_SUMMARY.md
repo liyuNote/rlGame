@@ -86,10 +86,10 @@
 | 距离变化奖励 | `reward = 1.0 if self.dis < old_distance else -1.0` | 比上一时刻更接近目标给正奖励，否则负奖励 |
 | 捕获区间奖励 | `d_capture <= dis <= 4*d_capture` | 鼓励进入目标附近范围 |
 | 危险区奖励 | `calculate_number_hanger_area()` | 如果正在接近且距离小于 `4*d_capture`，认为处于有效接近区 |
-| 位置接近奖励 | `reward_of_action3()` | 距离越接近 `d_capture` 附近，奖励越高 |
-| 速度惩罚 | `reward_of_action1()` | 速度过大给惩罚，避免策略无限增速 |
-| 朝向奖励 | `reward_of_action2()` | 速度方向越朝向逃逸方，奖励越高 |
-| 燃料奖励 | `reward_of_action4()` | 保留燃料越多，奖励越高 |
+| 位置接近奖励 | `distance_reward()` | 距离越接近 `d_capture` 附近，奖励越高 |
+| 速度惩罚 | `velocity_penalty()` | 速度过大给惩罚，避免策略无限增速 |
+| 朝向奖励 | `direction_reward()` | 速度方向越朝向逃逸方，奖励越高 |
+| 燃料保留奖励 | `fuel_conservation_reward()` | 剩余燃料比例越高，奖励越高 |
 | 捕获成功奖励 | `win_reward` | 成功捕获直接给 `100` |
 | 失败/超时奖励 | `burn_reward` | 当前为 `0` |
 
