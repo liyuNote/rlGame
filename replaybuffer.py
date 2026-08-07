@@ -27,13 +27,14 @@ class ReplayBuffer:
         self.episode_done[index] = episode_done
         self.count += 1
 
-    def numpy_to_tensor(self):
+    def numpy_to_tensor(self, device=None):
+        device = device or torch.device("cpu")
         return (
-            torch.tensor(self.s, dtype=torch.float32),
-            torch.tensor(self.a, dtype=torch.float32),
-            torch.tensor(self.a_logprob, dtype=torch.float32),
-            torch.tensor(self.r, dtype=torch.float32),
-            torch.tensor(self.s_, dtype=torch.float32),
-            torch.tensor(self.terminated, dtype=torch.float32),
-            torch.tensor(self.episode_done, dtype=torch.float32),
+            torch.tensor(self.s, dtype=torch.float32, device=device),
+            torch.tensor(self.a, dtype=torch.float32, device=device),
+            torch.tensor(self.a_logprob, dtype=torch.float32, device=device),
+            torch.tensor(self.r, dtype=torch.float32, device=device),
+            torch.tensor(self.s_, dtype=torch.float32, device=device),
+            torch.tensor(self.terminated, dtype=torch.float32, device=device),
+            torch.tensor(self.episode_done, dtype=torch.float32, device=device),
         )

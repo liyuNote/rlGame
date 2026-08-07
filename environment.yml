@@ -1,6 +1,7 @@
 name: rlgame-ppo
 channels:
   - pytorch
+  - nvidia
   - conda-forge
   - defaults
 dependencies:
@@ -11,5 +12,5 @@ dependencies:
   - matplotlib
   - tqdm
   - gymnasium
-  - pytorch
-  - cpuonly
+  - pytorch::pytorch
+  - nvidia::pytorch-cuda=12.4
